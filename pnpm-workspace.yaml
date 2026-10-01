@@ -4,3 +4,5 @@ allowBuilds:
   prisma: true
   esbuild: true
   bcrypt: false
+  '@firebase/util': false
+  protobufjs: false
