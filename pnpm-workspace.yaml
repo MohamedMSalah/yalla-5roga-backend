@@ -6,3 +6,4 @@ allowBuilds:
   bcrypt: false
   '@firebase/util': false
   protobufjs: false
+  '@scarf/scarf': false
