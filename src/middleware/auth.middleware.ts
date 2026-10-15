@@ -12,6 +12,56 @@ function extractBearerToken(req: Request): string | null {
   return token;
 }
 
+type IdTokenClaimPreview = {
+  aud: unknown;
+  iss: unknown;
+  iat: unknown;
+  exp: unknown;
+};
+
+function readIdTokenClaims(token: string): IdTokenClaimPreview | null {
+  const segment = token.split(".")[1];
+  if (!segment) return null;
+
+  try {
+    const payload: unknown = JSON.parse(
+      Buffer.from(segment, "base64url").toString("utf8"),
+    );
+    if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+      return null;
+    }
+
+    const record = payload as Record<string, unknown>;
+    return {
+      aud: record.aud ?? null,
+      iss: record.iss ?? null,
+      iat: record.iat ?? null,
+      exp: record.exp ?? null,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function logIdTokenClaims(token: string, configuredProjectId: string | null) {
+  const claims = readIdTokenClaims(token);
+  const expectedIssuer = configuredProjectId
+    ? `https://securetoken.google.com/${configuredProjectId}`
+    : null;
+
+  console.error("[Firebase Auth] ID token claims", {
+    aud: claims?.aud ?? null,
+    iss: claims?.iss ?? null,
+    iat: claims?.iat ?? null,
+    exp: claims?.exp ?? null,
+    configuredProjectId,
+    audienceMatchesProject:
+      typeof claims?.aud === "string" && claims.aud === configuredProjectId,
+    issuerMatchesProject:
+      typeof claims?.iss === "string" && claims.iss === expectedIssuer,
+  });
+}
+
 function logTokenDiagnostics(header: string | undefined, token: string) {
   const segments = token.split(".");
   const hasSurroundingQuotes =
@@ -32,7 +82,9 @@ function logTokenDiagnostics(header: string | undefined, token: string) {
 
 async function verifyToken(token: string, header: string | undefined) {
   logTokenDiagnostics(header, token);
-  const decoded = await getFirebaseAuth().verifyIdToken(token);
+  const auth = getFirebaseAuth();
+  logIdTokenClaims(token, auth.app.options.projectId ?? null);
+  const decoded = await auth.verifyIdToken(token);
 
   return {
     uid: decoded.uid,
